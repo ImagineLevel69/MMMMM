@@ -3,6 +3,7 @@ package com.mmmmm.client;
 import com.mmmmm.Config;
 import com.mmmmm.MMMMM;
 import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.screens.multiplayer.JoinMultiplayerScreen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.client.Minecraft;
@@ -20,6 +21,7 @@ import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.util.List;
 import java.util.concurrent.Executors;
 
 /**
@@ -35,33 +37,46 @@ public class ClientEventHandlers {
     private static Button updateCheckButton;
 
     /**
-     * Adds a custom button to the multiplayer screen.
+     * Adds a custom button for each server to the multiplayer screen.
      */
     @SubscribeEvent
-    public static void onMultiplayerScreenInit(Post event) {  // Fixed function name
+    public static void onMultiplayerScreenInit(Post event) {
         if (event.getScreen() instanceof JoinMultiplayerScreen screen) {
-            LOGGER.info("Multiplayer screen initialized. Adding button.");
+            LOGGER.info("Multiplayer screen initialized. Adding buttons for servers.");
 
-            int screenWidth = screen.width;
-            int screenHeight = screen.height;
+            List<String> serverList = Config.getServerList(); // Assume Config provides a list of servers
+            int buttonWidth = 150;
+            int buttonHeight = 20;
+            int spacing = 5;
+            int startX = screen.width / 2 - buttonWidth / 2;
+            int startY = screen.height / 4 + 48;
 
-            // Correct button positioning (centered)
-            int newButtonX = screenWidth + Config.buttonX;
-            int newButtonY = screenHeight + Config.buttonY;
+            for (int i = 0; i < serverList.size(); i++) {
+                String serverName = serverList.get(i);
+                int buttonY = startY + i * (buttonHeight + spacing);
 
-            // Create the button
-            updateCheckButton = Button.builder(
-                    Component.literal("Check for updates"),
-                    (btn) -> {
-                        LOGGER.info("Update check button clicked!");
-                        onButtonClicked(btn);
-                    }
-            ).bounds(newButtonX, newButtonY, 150, 20).build();
+                Button serverButton = Button.builder(
+                        Component.literal(serverName),
+                        (btn) -> {
+                            LOGGER.info("Server button clicked: {}", serverName);
+                            connectToServer(serverName);
+                        }
+                ).bounds(startX, buttonY, buttonWidth, buttonHeight).build();
 
-            // Properly add button to screen
-            event.addListener(updateCheckButton);
-            LOGGER.info("Button successfully added at ({}, {}).", newButtonX, newButtonY);
+                event.addListener(serverButton);
+            }
+
+            LOGGER.info("Server buttons successfully added.");
         }
+    }
+
+    /**
+     * Logic to handle connecting to a server when its button is clicked.
+     */
+    private static void connectToServer(String serverName) {
+        // Implement server connection logic here
+        LOGGER.info("Attempting to connect to server: {}", serverName);
+        // Example: Minecraft.getInstance().setScreen(new ConnectingScreen(serverName));
     }
 
     /**
@@ -195,7 +210,6 @@ public class ClientEventHandlers {
             sendPlayerMessage("Failed to extract mods. Check logs for details.");
         }
     }
-
 
     /**
      * Sends a system message to the player.
