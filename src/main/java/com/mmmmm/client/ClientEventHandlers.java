@@ -1,18 +1,21 @@
 package com.mmmmm.client;
 
-import com.mmmmm.Config;
 import com.mmmmm.MMMMM;
-import com.mmmmm.network.RequestDownloadUrlPacket;
+import com.mmmmm.network.NetworkHandler;
+import com.sun.jna.WString;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.multiplayer.JoinMultiplayerScreen;
 import net.minecraft.client.multiplayer.ServerData;
 import net.minecraft.client.multiplayer.ServerList;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.ScreenEvent.Init.Post;
 import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.neoforge.network.PacketDistributor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -50,6 +53,8 @@ public class ClientEventHandlers {
             ServerList serverList = new ServerList(Minecraft.getInstance());
             serverList.load();
 
+            String updater = "updater";
+
             int buttonX = screen.width - 160; // Position buttons on the right side
             int buttonY = 50;
             int buttonSpacing = 24;
@@ -64,7 +69,7 @@ public class ClientEventHandlers {
                         Component.literal("Update " + server.name),
                         (btn) -> {
                             LOGGER.info("Requesting update URL for server: {}", server.name);
-                            ModNetworkHandler.sendToServer(new RequestDownloadUrlPacket());
+                            NetworkHandler.sendToServer("Update");
                         }
                 ).bounds(buttonX, yOffset, 150, 20).build();
 
