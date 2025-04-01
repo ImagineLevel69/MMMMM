@@ -99,26 +99,4 @@ public class Config {
         MMMMM.LOGGER.info("Enable File Server: {}", enableFileServer);
         MMMMM.LOGGER.info("File Directory: {}", fileDirectory);
     }
-
-    /**
-     * Returns a list of server names or addresses from a configuration file.
-     */
-    public static List<String> getServerList() {
-        Path serverListPath = Paths.get("MMMMM/servers.txt"); // Path to the server list file
-        try {
-            if (Files.exists(serverListPath)) {
-                // Read all lines from the file and return as a list
-                return Files.lines(serverListPath)
-                        .map(String::trim)
-                        .filter(line -> !line.isEmpty() && !line.startsWith("#")) // Ignore empty lines and comments
-                        .collect(Collectors.toList());
-            } else {
-                MMMMM.LOGGER.warn("Server list file not found at: {}", serverListPath);
-            }
-        } catch (IOException e) {
-            MMMMM.LOGGER.error("Failed to read server list file.", e);
-        }
-        // Fallback to a default list if the file is missing or unreadable
-        return Arrays.asList("Default Server 1", "Default Server 2");
-    }
 }

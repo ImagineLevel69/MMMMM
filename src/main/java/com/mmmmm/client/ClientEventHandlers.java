@@ -2,11 +2,14 @@ package com.mmmmm.client;
 
 import com.mmmmm.Config;
 import com.mmmmm.MMMMM;
-import net.minecraft.client.gui.components.Button;
-import net.minecraft.client.gui.components.AbstractWidget;
-import net.minecraft.client.gui.screens.multiplayer.JoinMultiplayerScreen;
-import net.minecraft.network.chat.Component;
+import com.mmmmm.network.ModNetworkHandler;
+import com.mmmmm.network.RequestDownloadUrlPacket;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.gui.screens.multiplayer.JoinMultiplayerScreen;
+import net.minecraft.client.multiplayer.ServerData;
+import net.minecraft.client.multiplayer.ServerList;
+import net.minecraft.network.chat.Component;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.ScreenEvent.Init.Post;
@@ -21,11 +24,12 @@ import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Executors;
 
 /**
- * Handles client-side events for ExampleMod.
+ * Handles client-side events for the mod.
  */
 @EventBusSubscriber(modid = MMMMM.MODID, bus = EventBusSubscriber.Bus.GAME, value = Dist.CLIENT)
 public class ClientEventHandlers {
@@ -34,98 +38,59 @@ public class ClientEventHandlers {
     private static final Path MOD_DOWNLOAD_PATH = Path.of("MMMMM/mods.zip");
     private static final Path UNZIP_DESTINATION = Path.of("mods");
     private static final Logger LOGGER = LoggerFactory.getLogger(ClientEventHandlers.class);
-    private static Button updateCheckButton;
+    private static final List<Button> serverButtons = new ArrayList<>();
 
     /**
-     * Adds a custom button for each server to the multiplayer screen.
+     * Adds custom buttons for each server in the server list on the multiplayer screen.
      */
     @SubscribeEvent
     public static void onMultiplayerScreenInit(Post event) {
         if (event.getScreen() instanceof JoinMultiplayerScreen screen) {
-            LOGGER.info("Multiplayer screen initialized. Adding buttons for servers.");
+            LOGGER.info("Multiplayer screen initialized. Adding server buttons.");
 
-            List<String> serverList = Config.getServerList(); // Assume Config provides a list of servers
-            int buttonWidth = 150;
-            int buttonHeight = 20;
-            int spacing = 5;
-            int startX = screen.width / 2 - buttonWidth / 2;
-            int startY = screen.height / 4 + 48;
+            ServerList serverList = new ServerList(Minecraft.getInstance());
+            serverList.load();
+
+            int buttonX = screen.width - 160; // Position buttons on the right side
+            int buttonY = 50;
+            int buttonSpacing = 24;
+            int maxHeight = screen.height - 50; // Keep buttons within screen height
 
             for (int i = 0; i < serverList.size(); i++) {
-                String serverName = serverList.get(i);
-                int buttonY = startY + i * (buttonHeight + spacing);
+                int yOffset = buttonY + (i * buttonSpacing);
+                if (yOffset + 20 > maxHeight) break; // Prevent buttons from going off-screen
 
+                ServerData server = serverList.get(i);
                 Button serverButton = Button.builder(
-                        Component.literal(serverName),
+                        Component.literal("Update " + server.name),
                         (btn) -> {
-                            LOGGER.info("Server button clicked: {}", serverName);
-                            connectToServer(serverName);
+                            LOGGER.info("Requesting update URL for server: {}", server.name);
+                            ModNetworkHandler.sendToServer(new RequestDownloadUrlPacket());
                         }
-                ).bounds(startX, buttonY, buttonWidth, buttonHeight).build();
+                ).bounds(buttonX, yOffset, 150, 20).build();
 
                 event.addListener(serverButton);
+                serverButtons.add(serverButton);
             }
-
-            LOGGER.info("Server buttons successfully added.");
         }
     }
 
     /**
-     * Logic to handle connecting to a server when its button is clicked.
+     * Starts the mod download process.
+     *
+     * @param url The URL to download the mods from.
      */
-    private static void connectToServer(String serverName) {
-        // Implement server connection logic here
-        LOGGER.info("Attempting to connect to server: {}", serverName);
-        // Example: Minecraft.getInstance().setScreen(new ConnectingScreen(serverName));
-    }
-
-    /**
-     * Logic to handle what happens when the button is clicked.
-     */
-    public static void onButtonClicked(Button button) {
-        LOGGER.info("Update check button was pressed!");
-        downloadAndProcessMod();
-    }
-
-    /**
-     * Checks if the player is available in the current context.
-     */
-    private static boolean isPlayerAvailable() {
-        return Minecraft.getInstance().player != null;
-    }
-
-    private static void downloadAndProcessMod() {
-        if (Config.packURL.isEmpty()) {
-            Minecraft.getInstance().setScreen(new WarningScreen(Component.literal("Enter URL to download mods from such as https://example.com/mods.zip:")));
-        }
+    public static void startModDownload(String url) {
         Executors.newSingleThreadExecutor().execute(() -> {
             try {
-                String modsUrl = Config.packURL; // URL for mods ZIP file
-                LOGGER.info("Starting mod download from: {}", modsUrl);
-
-                // Initialize connection and download the file
-                HttpURLConnection connection = initializeConnection(modsUrl);
+                LOGGER.info("Starting mod download from: {}", url);
+                HttpURLConnection connection = initializeConnection(url);
                 downloadFile(connection, MOD_DOWNLOAD_PATH);
-
-                // Check if the ZIP file is valid (non-empty)
-                if (Files.size(MOD_DOWNLOAD_PATH) == 0) {
-                    LOGGER.error("Downloaded ZIP file is empty: {}", MOD_DOWNLOAD_PATH);
-                    throw new IOException("The downloaded mods file is empty!");
-                }
-                LOGGER.info("Downloaded ZIP file size: {} bytes", Files.size(MOD_DOWNLOAD_PATH));
-
-                // Proceed to extract the ZIP file
-                if (!Files.exists(UNZIP_DESTINATION)) {
-                    Files.createDirectories(UNZIP_DESTINATION);
-                }
                 zipIn(MOD_DOWNLOAD_PATH, UNZIP_DESTINATION);
-
-                // Notify success
                 sendPlayerMessage("Mods downloaded and extracted successfully!");
-
             } catch (Exception e) {
                 LOGGER.error("Failed to download or extract mods", e);
-                sendPlayerMessage("Failed to download or extract mods. Check logs for more details.");
+                sendPlayerMessage("Failed to download or extract mods. Check logs.");
             }
         });
     }
@@ -149,73 +114,35 @@ public class ClientEventHandlers {
 
     private static void downloadFile(HttpURLConnection connection, Path destination) throws Exception {
         try (InputStream in = connection.getInputStream()) {
-            String contentType = connection.getHeaderField("Content-Type");
-
-            // Accept both application/zip and application/octet-stream
-            if (!"application/zip".equals(contentType) && !"application/octet-stream".equals(contentType)) {
-                String errorPreview = new String(in.readNBytes(50)); // Read for debugging
-                LOGGER.error("Unexpected Content-Type: {}. Preview of response: {}", contentType, errorPreview);
-                throw new IOException("Unexpected Content-Type: " + contentType + ". Expected application/zip.");
-            }
-
-            // Proceed to download the file
             Files.copy(in, destination, StandardCopyOption.REPLACE_EXISTING);
             LOGGER.info("File downloaded successfully to: {}", destination);
         }
     }
 
-    private static void zipIn(Path zipFilePath, Path destinationPath) {
+    private static void zipIn(Path zipFilePath, Path destinationPath) throws Exception {
         try (InputStream fileInputStream = Files.newInputStream(zipFilePath);
              java.util.zip.ZipInputStream zipInputStream = new java.util.zip.ZipInputStream(fileInputStream)) {
 
             java.util.zip.ZipEntry entry;
-
             while ((entry = zipInputStream.getNextEntry()) != null) {
-                // Extract entry name and normalize
-                Path entryPath = Path.of(entry.getName()).normalize();
-
-                // If the entry has only one component (e.g., "mod1.jar"), use it directly
-                if (entryPath.getNameCount() == 1) {
-                    entryPath = entryPath.getFileName(); // Use just the file name
-                } else if (entryPath.getNameCount() > 1) {
-                    // If the entry has subpaths, adjust the path accordingly
-                    entryPath = entryPath.subpath(1, entryPath.getNameCount());
-                } else {
-                    LOGGER.warn("Skipping invalid or empty entry: {}", entry.getName());
-                    continue;
-                }
-
-                // Final file location
-                Path newFilePath = destinationPath.resolve(entryPath).normalize();
-
-                // Ensure the path doesn't escape the destination directory
-                if (!newFilePath.startsWith(destinationPath)) {
+                Path entryPath = destinationPath.resolve(entry.getName()).normalize();
+                if (!entryPath.startsWith(destinationPath)) {
                     throw new IOException("Invalid ZIP entry attempting to escape destination: " + entry.getName());
                 }
-
                 if (entry.isDirectory()) {
-                    Files.createDirectories(newFilePath);
+                    Files.createDirectories(entryPath);
                 } else {
-                    Files.createDirectories(newFilePath.getParent());
-                    Files.copy(zipInputStream, newFilePath, StandardCopyOption.REPLACE_EXISTING);
+                    Files.createDirectories(entryPath.getParent());
+                    Files.copy(zipInputStream, entryPath, StandardCopyOption.REPLACE_EXISTING);
                 }
-
                 zipInputStream.closeEntry();
             }
-
             LOGGER.info("ZIP file extracted successfully to: {}", destinationPath);
-
-        } catch (Exception e) {
-            LOGGER.error("Failed to extract ZIP file.", e);
-            sendPlayerMessage("Failed to extract mods. Check logs for details.");
         }
     }
 
-    /**
-     * Sends a system message to the player.
-     */
     private static void sendPlayerMessage(String message) {
-        if (isPlayerAvailable()) {
+        if (Minecraft.getInstance().player != null) {
             Minecraft.getInstance().player.sendSystemMessage(Component.literal(message));
         }
     }

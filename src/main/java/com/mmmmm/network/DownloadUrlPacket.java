@@ -4,7 +4,6 @@ import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.client.Minecraft;
 import java.util.function.Supplier;
 import net.neoforged.neoforge.common.NetworkEvent;
-
 import com.mmmmm.client.DownloadConfirmScreen;
 
 /**
