@@ -2,7 +2,6 @@ package com.mmmmm.client;
 
 import com.mmmmm.Config;
 import com.mmmmm.MMMMM;
-import com.mmmmm.network.ModNetworkHandler;
 import com.mmmmm.network.RequestDownloadUrlPacket;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.components.Button;
