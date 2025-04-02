@@ -9,9 +9,8 @@ import net.neoforged.neoforge.network.registration.NetworkChannel;
  * Handles network packet registration and sending in NeoForge.
  */
 public class NetworkHandler {
-    private static final ResourceLocation CHANNEL_ID = ResourceLocation("mmmmm", "channel"); // Use the actual mod ID
-
-    public static final NetworkChannel CHANNEL = new NetworkChannel(CHANNEL_ID);
+    private static final ResourceLocation CHANNEL_ID = ResourceLocation.tryBuild("mmmmm", "channel");
+    public static final NetworkChannel CHANNEL = new NetworkChannel(CHANNEL_ID, "1");
 
     /**
      * Registers network messages.
